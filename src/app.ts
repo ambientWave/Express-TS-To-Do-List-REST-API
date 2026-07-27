@@ -29,6 +29,49 @@ app.post('/tasks', (req: Request, res: Response) => { // create new task
     res.status(201).send(JSON.stringify(newTask));
 });
 
+app.put('/tasks/:id', (req: Request, res: Response) => {
+    const id: number = Number(req.params.id);
+    if (!id) {
+        res.status(404).send("Task ID cannot be parsed");
+        return;
+    }
+    const task: { id: number; title: string; done: boolean } | undefined = tasks.find((task) => task.id === id);
+    if (!task) {
+        res.status(404).send(`Task with id ${id} not found`);
+        return;
+    } else {
+        const updatedTask = req.body;
+        if (!updatedTask || (updatedTask.title && typeof updatedTask.title !== "string") || (updatedTask.done && typeof updatedTask.done !== "boolean")) {
+            res.status(400).send("Invalid task format");
+            return;
+        } else {
+            if (updatedTask.title) {
+                task.title = updatedTask.title;
+            }
+            if (updatedTask.done !== undefined) {
+                task.done = updatedTask.done;
+            }
+            res.status(200).send(JSON.stringify(task));
+        }
+    }
+});
+
+app.delete('/tasks/:id', (req: Request, res: Response) => {
+    const id: number = Number(req.params.id);
+    if (!id) {
+        res.status(404).send("Task ID cannot be parsed");
+        return;
+    }
+    const task: { id: number; title: string; done: boolean } | undefined = tasks.find((task) => task.id === id);
+    if (!task) {
+        res.status(404).send(`Task with id ${id} not found`);
+        return;
+    } else {
+        tasks.splice(tasks.indexOf(task), 1);
+        res.status(204);
+    }
+});
+
 app.get('/tasks', (req: Request, res: Response) => {
     res.send(JSON.stringify(tasks));
 });
