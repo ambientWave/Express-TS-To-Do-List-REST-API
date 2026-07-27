@@ -4,6 +4,10 @@ A small Express + TypeScript REST API that manages an in-memory to-do list.
 It supports the four CRUD operations — create, read, update, and delete — on tasks,
 and ships with interactive Swagger UI documentation at `/docs`.
 
+## Screenshot
+<img width="1918" height="901" alt="swagger_docs" src="https://github.com/user-attachments/assets/6e9e0667-8dd8-439b-a850-c8e1dcc6c706" />
+
+
 ## Install & run
 
 ```bash
