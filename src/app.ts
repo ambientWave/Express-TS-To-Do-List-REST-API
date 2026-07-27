@@ -2,7 +2,12 @@ import express, { type Express, type Request, type Response } from 'express';
 
 const app: Express = express();
 
-const tasks: Array<{ id: number; title: string; done: boolean }> = [{ id: 1, title: "Task 1", done: false }, { id: 2, title: "Task 2", done: true }, { id: 3, title: "Task 3", done: false }];
+// In-memory storage for tasks
+const tasks: Array<{ id: number; title: string; done: boolean }> = [
+    { id: 1, title: "Task 1", done: false },
+    { id: 2, title: "Task 2", done: true },
+    { id: 3, title: "Task 3", done: false }
+];
 
 app.get('/', (req: Request, res: Response) => {
     const appInfo: Object = { "name": "Task API", "version": "1.0", "endpoints": ["/tasks"] };
@@ -11,6 +16,17 @@ app.get('/', (req: Request, res: Response) => {
 
 app.get('/health', (req: Request, res: Response) => {
     res.send(JSON.stringify({ "status": "ok" }));
+});
+
+app.post('/tasks', (req: Request, res: Response) => { // create new task
+    const title: string = req.body.title;
+    if (!title) {
+        res.status(400).send("Task title cannot be empty");
+        return;
+    }
+    const newTask: { id: number; title: string; done: boolean } = { id: tasks.length + 1, title: title, done: false };
+    tasks.push(newTask);
+    res.status(201).send(JSON.stringify(newTask));
 });
 
 app.get('/tasks', (req: Request, res: Response) => {
