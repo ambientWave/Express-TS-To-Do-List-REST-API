@@ -1,6 +1,7 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type ErrorRequestHandler, type NextFunction } from 'express';
+import { listTasks, getTask, createTask, updateTask, deleteTask, getStats, resetTasks } from '../services/tasks.service.ts';
+const router: Router = Router();
 
-const router = Router();
 
 /**
  * @swagger
@@ -117,92 +118,46 @@ const router = Router();
  *         description: A successful response
  */
 
-// In-memory storage for tasks
-const tasks: Array<{ id: number; title: string; done: boolean }> = [
-    { id: 1, title: "Task 1", done: false },
-    { id: 2, title: "Task 2", done: true },
-    { id: 3, title: "Task 3", done: false }
-];
-
-router.get('/', (req: Request, res: Response) => {
-    const appInfo: Object = { "name": "Task API", "version": "1.0", "endpoints": ["/tasks"] };
-    res.send(JSON.stringify(appInfo));
-});
-
-router.get('/health', (req: Request, res: Response) => {
-    res.send(JSON.stringify({ "status": "ok" }));
-});
-
-router.post('/tasks', (req: Request, res: Response) => { // create new task
-    const title: string = req.body.title;
-    if (!title) {
-        res.status(400).send("Task title cannot be empty");
-        return;
-    }
-    const newTask: { id: number; title: string; done: boolean } = { id: tasks.length + 1, title: title, done: false };
-    tasks.push(newTask);
-    res.status(201).send(JSON.stringify(newTask));
-});
-
-router.put('/tasks/:id', (req: Request, res: Response) => {
-    const id: number = Number(req.params.id);
-    if (!id) {
-        res.status(404).send("Task ID cannot be parsed");
-        return;
-    }
-    const task: { id: number; title: string; done: boolean } | undefined = tasks.find((task) => task.id === id);
-    if (!task) {
-        res.status(404).send(`Task with id ${id} not found`);
-        return;
-    } else {
-        const updatedTask = req.body;
-        if (!updatedTask || (updatedTask.title && typeof updatedTask.title !== "string") || (updatedTask.done && typeof updatedTask.done !== "boolean")) {
-            res.status(400).send("Invalid task format");
-            return;
-        } else {
-            if (updatedTask.title) {
-                task.title = updatedTask.title;
-            }
-            if (updatedTask.done !== undefined) {
-                task.done = updatedTask.done;
-            }
-            res.status(200).send(JSON.stringify(task));
-        }
+router.post('/tasks', (req: Request, res: Response, next: NextFunction) => { // create new task
+    try {
+        const task = createTask(req.body ?? {});
+        res.status(201).json(task); // similar to res.status(201).send(JSON.stringify(newTask));
+    } catch (err) {
+        next(err); // if an error occurs, pass it to the error handler
     }
 });
 
-router.delete('/tasks/:id', (req: Request, res: Response) => {
-    const id: number = Number(req.params.id);
-    if (!id) {
-        res.status(404).send("Task ID cannot be parsed");
-        return;
-    }
-    const task: { id: number; title: string; done: boolean } | undefined = tasks.find((task) => task.id === id);
-    if (!task) {
-        res.status(404).send(`Task with id ${id} not found`);
-        return;
-    } else {
-        tasks.splice(tasks.indexOf(task), 1);
-        res.status(204);
+router.put('/tasks/:id', (req: Request, res: Response, next: NextFunction) => {
+    try {
+        res.json(updateTask(Number(req.params.id), req.body ?? {}));
+    } catch (err) {
+        next(err);
     }
 });
 
-router.get('/tasks', (req: Request, res: Response) => {
-    res.send(JSON.stringify(tasks));
+router.delete('/tasks/:id', (req: Request, res: Response, next: NextFunction) => {
+    try {
+        deleteTask(Number(req.params.id));
+        res.status(204).send();
+    } catch (err) {
+        next(err);
+    }
 });
 
-router.get('/tasks/:id', (req: Request, res: Response) => {
-    const id: number = Number(req.params.id);
-    if (!id) {
-        res.status(404).send("Task ID cannot be parsed");
-        return;
+router.get('/tasks', (req: Request, res: Response, next: NextFunction) => {
+    try {
+        res.json(listTasks(req.query.done as string | undefined, req.query.search as string | undefined));
+    } catch (err) {
+        next(err);
     }
-    const task: Object | undefined = tasks.find((task) => task.id === id);
-    if (!task) {
-        res.status(404).send(`Task with id ${id} not found`);
-        return;
+});
+
+router.get('/tasks/:id', (req: Request, res: Response, next: NextFunction) => {
+    try {
+        res.json(getTask(Number(req.params.id)));
+    } catch (err) {
+        next(err);
     }
-    res.send(JSON.stringify(task));
 });
 
 export default router;
