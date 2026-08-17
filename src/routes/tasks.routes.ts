@@ -19,6 +19,14 @@ const router: Router = Router();
  *         done:
  *           type: boolean
  *           example: false
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           example: '2026-08-18T01:23:45.678Z'
+ *         updated_at:
+ *           type: string
+ *           format: date-time
+ *           example: '2026-08-18T01:23:45.678Z'
  *     TaskInput:
  *       type: object
  *       required:

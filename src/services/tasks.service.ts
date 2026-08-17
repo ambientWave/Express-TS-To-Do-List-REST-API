@@ -3,40 +3,39 @@
 // ===========================================================================
 // This is where the *decisions* live: what makes input valid, how a new id is
 // chosen, what "not found" means. It never touches req/res (that's the route's
-// job) and never touches the tasks array (that's the repository's job) — it
+// job) and never touches raw SQL (that's the DAO/repository's job) — it
 // just calls the repository and throws domain errors when a rule is broken.
 
-import { type Task, type TaskRow, TaskRepository } from '../repositories/tasks.repository.ts';
+import { TaskRepository } from '../repositories/tasks.repository.ts';
+import type { TaskDto, CreateTaskDto, UpdateTaskDto, TaskStatsDto } from '../dto/tasks.dto.ts';
 import { NotFoundError, ValidationError } from '../errors.ts';
 
 const repo = new TaskRepository();
 
-function listTasks(done: string | undefined, search: string | undefined): Array<Task> {
-    let result = repo.findAll();
+function listTasks(done: string | undefined, search: string | undefined): Array<TaskDto> {
+    let wantDone: boolean | undefined = undefined;
 
-    // Extra: filter by done=true / done=false
+    // Filter by done=true / done=false via SQL WHERE
     if (done !== undefined) {
         if (done !== 'true' && done !== 'false') {
             throw new ValidationError('done must be true or false');
         }
-        const wantDone = done === 'true';
-        result = result.filter((t) => t.done === wantDone);
+        wantDone = done === 'true';
     }
 
-    // Extra: search titles
+    // Search titles via SQL LIKE
+    let searchWord: string | undefined = undefined;
     if (search !== undefined) {
-        const word = String(search).trim();
-        if (word === '') {
+        searchWord = String(search).trim();
+        if (searchWord === '') {
             throw new ValidationError('search must not be empty');
         }
-        const lower = word.toLowerCase();
-        result = result.filter((t) => t.title.toLowerCase().includes(lower));
     }
 
-    return result;
+    return repo.findAll({ done: wantDone, search: searchWord });
 }
 
-function getTask(id: number): Task {
+function getTask(id: number): TaskDto {
     const task = repo.findById(id);
     if (!task) {
         throw new NotFoundError(`Task ${id} not found`);
@@ -44,21 +43,20 @@ function getTask(id: number): Task {
     return task;
 }
 
-function createTask(body: { title: string; done: boolean }): Task {
-    let { title } = body;
-    let done: number = 0;
+function createTask(body: CreateTaskDto): TaskDto {
+    const { title } = body;
     if (title === undefined || title === null || String(title).trim() === '') {
         throw new ValidationError('title is required and cannot be empty');
     }
-    if (typeof body.done !== 'boolean') {
+    if (body.done !== undefined && typeof body.done !== 'boolean') {
         throw new ValidationError('done must be a boolean');
     }
-    done = body.done ? 1 : 0; // watch out for this switch
+    const done = body.done ? 1 : 0;
 
     return repo.create({ title: String(title).trim(), done });
 }
 
-function updateTask(id: number, body: { title: string | undefined, done: boolean | undefined }): Task {
+function updateTask(id: number, body: UpdateTaskDto): TaskDto {
     const hasTitle = Object.prototype.hasOwnProperty.call(body, 'title');
     const hasDone = Object.prototype.hasOwnProperty.call(body, 'done');
 
@@ -66,10 +64,10 @@ function updateTask(id: number, body: { title: string | undefined, done: boolean
         throw new ValidationError('request body must include title and/or done');
     }
 
-    const changes: Partial<TaskRow> = {};
+    const changes: { title?: string; done?: number } = {};
 
     if (hasTitle) {
-        if (body.title === null || String(body.title).trim() === '') {
+        if (body.title === null || body.title === undefined || String(body.title).trim() === '') {
             throw new ValidationError('title cannot be empty');
         }
         changes.title = String(body.title).trim();
@@ -96,13 +94,11 @@ function deleteTask(id: number): void {
     }
 }
 
-function getStats(): { total: number, done: number, open: number } {
-    const all = repo.findAll();
-    const done = all.filter((t) => t.done).length;
-    return { total: all.length, done, open: all.length - done };
+function getStats(): TaskStatsDto {
+    return repo.getStats();
 }
 
-function resetTasks(): Task[] {
+function resetTasks(): TaskDto[] {
     return repo.reset();
 }
 

@@ -1,118 +1,61 @@
 // ===========================================================================
-// REPOSITORY LAYER — the ONLY file that knows *where* tasks are stored.
+// REPOSITORY LAYER — Coordinates DAO operations and maps DAO rows to Domain/DTO models
 // ===========================================================================
-// Right now that's a list in memory (exactly like Assignment 1). But this is
-// the single file you rewrite to move to a real database:
-//   - Assignment 2 (SQLite):   these functions run SELECT / INSERT / UPDATE / DELETE
-//   - Assignment 3 (Postgres): same functions, a different driver
-// The routes and the service NEVER change, because they only ever call
-// findAll / findById / create / update / remove — they don't care what's behind them.
-// That's the beauty of layered architecture. Changes in DB require only changes in persistence layer; not all the app.
-// The functions return COPIES, the way a database hands you fresh rows.
 
-import Database from 'better-sqlite3';
-import path from 'path';
+import { TaskDao, type TaskRow, type TaskDaoFilter, type TaskDaoStats } from '../dao/tasks.dao.ts';
+import type { TaskDto, TaskStatsDto } from '../dto/tasks.dto.ts';
 
-export interface Task {
-    id: number;
-    title: string;
-    done: boolean;
-}
-
-export interface TaskRow {
-    id: number;
-    title: string;
-    done: number;
-}
+// Re-export domain interfaces for backward compatibility
+export type Task = TaskDto;
+export type { TaskRow, TaskDaoFilter as FindAllOptions, TaskDaoStats as TaskStats };
 
 export class TaskRepository {
-    private db: Database.Database;
+    private dao: TaskDao;
 
-    private SEED_TASKS: TaskRow[] = [
-        { id: 1, title: 'Buy groceries', done: 0 },
-        { id: 2, title: 'Walk the dog', done: 1 },
-        { id: 3, title: 'Read a book', done: 0 }
-    ];
-
-    constructor(dbPath: string = path.resolve('tasks.db')) {
-        this.db = new Database(dbPath); // better-sqlite3 creates the database file automatically if it doesn't exist
-        this.db.pragma('journal_mode = WAL'); // WAL mode improves concurrency and performance
-
-        this.db.exec(`
-            CREATE TABLE IF NOT EXISTS "tasks" (
-                "id" INTEGER NOT NULL,
-                "title" TEXT NOT NULL,
-                "done" INTEGER NOT NULL CHECK(done IN (0, 1)),
-                PRIMARY KEY("id" AUTOINCREMENT)
-            )
-        `);
-
-        // Seed initial tasks only if the tasks table is empty (first run)
-        const rowCount = (this.db.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number }).count;
-        if (rowCount === 0) {
-            const insertSeed = this.db.prepare('INSERT INTO tasks (id, title, done) VALUES (?, ?, ?)');
-            const seedTransaction = this.db.transaction(() => {
-                for (const task of this.SEED_TASKS) {
-                    insertSeed.run(task.id, task.title, task.done);
-                }
-            });
-            seedTransaction();
-        }
+    constructor(dbPath?: string) {
+        this.dao = new TaskDao(dbPath);
     }
 
-    private toTask(row: TaskRow): Task {
+    private toTask(row: TaskRow): TaskDto {
         return {
             id: row.id,
             title: row.title,
             done: Boolean(row.done),
+            created_at: row.created_at,
+            updated_at: row.updated_at,
         };
     }
 
-    findAll(): Task[] {
-        const rows = this.db.prepare('SELECT id, title, done FROM tasks ORDER BY id ASC').all() as TaskRow[];
+    findAll(options?: TaskDaoFilter): TaskDto[] {
+        const rows = this.dao.findAll(options);
         return rows.map((row) => this.toTask(row));
     }
 
-    findById(id: number): Task | null {
-        const row = this.db.prepare('SELECT id, title, done FROM tasks WHERE id = ?').get(id) as TaskRow | undefined;
+    findById(id: number): TaskDto | null {
+        const row = this.dao.findById(id);
         return row ? this.toTask(row) : null;
     }
 
-    create({ title, done }: { title: string; done: number }): Task {
-        const stmt = this.db.prepare('INSERT INTO tasks (title, done) VALUES (?, ?)');
-        const info = stmt.run(title, done); // { changes: 1, lastInsertRowid: 4 }
-        const newId = Number(info.lastInsertRowid);
-        return {
-            id: newId,
-            title,
-            done: Boolean(done),
-        };
+    create({ title, done }: { title: string; done: number }): TaskDto {
+        const createdRow = this.dao.insert({ title, done });
+        return this.toTask(createdRow);
     }
 
-    update(id: number, changes: Partial<{ title: string; done: number }>): Task | null {
-        const existing = this.findById(id);
-        if (!existing) return null;
-        const newTitle = changes.title !== undefined ? changes.title : existing.title;
-        const newDone = changes.done !== undefined ? changes.done : (existing.done ? 1 : 0);
-        this.db.prepare('UPDATE tasks SET title = ?, done = ? WHERE id = ?').run(newTitle, newDone, id);
-        return this.findById(id); // different implementation than what is used in create
+    update(id: number, changes: Partial<{ title: string; done: number }>): TaskDto | null {
+        const updatedRow = this.dao.update(id, changes);
+        return updatedRow ? this.toTask(updatedRow) : null;
     }
 
     remove(id: number): boolean {
-        const info = this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
-        return info.changes > 0;
+        return this.dao.delete(id);
     }
 
-    reset(): Task[] {
-        const resetTransaction = this.db.transaction(() => {
-            this.db.exec("DELETE FROM tasks");
-            this.db.exec("DELETE FROM sqlite_sequence WHERE name = 'tasks'");
-            const insertStmt = this.db.prepare('INSERT INTO tasks (id, title, done) VALUES (?, ?, ?)');
-            for (const task of this.SEED_TASKS) {
-                insertStmt.run(task.id, task.title, task.done);
-            }
-        });
-        resetTransaction();
-        return this.findAll();
+    getStats(): TaskStatsDto {
+        return this.dao.countStats();
+    }
+
+    reset(): TaskDto[] {
+        const rows = this.dao.reset();
+        return rows.map((row) => this.toTask(row));
     }
 }
