@@ -34,12 +34,9 @@ export class TaskRepository {
         { id: 3, title: 'Read a book', done: 0 }
     ];
 
-    private tasks: TaskRow[];
-
     constructor(dbPath: string = path.resolve('tasks.db')) {
-        this.tasks = this.SEED_TASKS.map((task) => ({ ...task }));
-        this.db = new Database(dbPath);
-        this.db.pragma('journal_mode = WAL');
+        this.db = new Database(dbPath); // better-sqlite3 creates the database file automatically if it doesn't exist
+        this.db.pragma('journal_mode = WAL'); // WAL mode improves concurrency and performance
 
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS "tasks" (
@@ -49,6 +46,18 @@ export class TaskRepository {
                 PRIMARY KEY("id" AUTOINCREMENT)
             )
         `);
+
+        // Seed initial tasks only if the tasks table is empty (first run)
+        const rowCount = (this.db.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number }).count;
+        if (rowCount === 0) {
+            const insertSeed = this.db.prepare('INSERT INTO tasks (id, title, done) VALUES (?, ?, ?)');
+            const seedTransaction = this.db.transaction(() => {
+                for (const task of this.SEED_TASKS) {
+                    insertSeed.run(task.id, task.title, task.done);
+                }
+            });
+            seedTransaction();
+        }
     }
 
     private toTask(row: TaskRow): Task {
