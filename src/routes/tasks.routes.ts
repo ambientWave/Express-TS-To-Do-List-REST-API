@@ -5,117 +5,244 @@ const router: Router = Router();
 
 /**
  * @swagger
- * /api/tasks:
+ * components:
+ *   schemas:
+ *     Task:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         title:
+ *           type: string
+ *           example: Buy groceries
+ *         done:
+ *           type: boolean
+ *           example: false
+ *     TaskInput:
+ *       type: object
+ *       required:
+ *         - title
+ *         - done
+ *       properties:
+ *         title:
+ *           type: string
+ *           example: Buy groceries
+ *         done:
+ *           type: boolean
+ *           example: false
+ *     TaskUpdateInput:
+ *       type: object
+ *       properties:
+ *         title:
+ *           type: string
+ *           example: Buy groceries and fruits
+ *         done:
+ *           type: boolean
+ *           example: true
+ *     Stats:
+ *       type: object
+ *       properties:
+ *         total:
+ *           type: integer
+ *           example: 3
+ *         done:
+ *           type: integer
+ *           example: 1
+ *         open:
+ *           type: integer
+ *           example: 2
+ *     ErrorResponse:
+ *       type: object
+ *       properties:
+ *         error:
+ *           type: string
+ *           example: Task not found
+ */
+
+/**
+ * @swagger
+ * /tasks:
  *   get:
  *     summary: Get all tasks
- *     description: Returns all tasks in the to-do list
+ *     description: Returns all tasks in the to-do list, with optional filtering and search.
+ *     tags:
+ *       - Tasks
+ *     parameters:
+ *       - in: query
+ *         name: done
+ *         schema:
+ *           type: string
+ *           enum: ['true', 'false']
+ *         description: Filter tasks by completion status ('true' or 'false')
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search tasks by title (case-insensitive substring match)
  *     responses:
  *       200:
- *         description: A successful response
+ *         description: List of tasks
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: number
- *                   title:
- *                     type: string
- *                   done:
- *                     type: boolean
+ *                 $ref: '#/components/schemas/Task'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *   post:
  *     summary: Create a new task
  *     description: Creates a new task in the to-do list
- *     responses:
- *       201:
- *         description: A successful response
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: number
- *                 title:
- *                   type: string
- *                 done:
- *                   type: boolean
- */
-
-/**
- * @swagger
- * /api/tasks/{id}:
- *   get:
- *     summary: Get a task by ID
- *     description: Returns a task by its ID
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: A successful response
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: number
- *                 title:
- *                   type: string
- *                 done:
- *                   type: boolean
- *   put:
- *     summary: Update a task
- *     description: Updates an existing task in the to-do list
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
+ *     tags:
+ *       - Tasks
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               title:
- *                 type: string
- *               done:
- *                 type: boolean
+ *             $ref: '#/components/schemas/TaskInput'
  *     responses:
- *       200:
- *         description: A successful response
+ *       201:
+ *         description: Task created successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: number
- *                 title:
- *                   type: string
- *                 done:
- *                   type: boolean
- *   delete:
- *     summary: Delete a task
- *     description: Deletes an existing task from the to-do list
+ *               $ref: '#/components/schemas/Task'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+
+/**
+ * @swagger
+ * /tasks/{id}:
+ *   get:
+ *     summary: Get a task by ID
+ *     description: Returns a single task by its numeric ID
+ *     tags:
+ *       - Tasks
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
+ *         description: The task ID
+ *     responses:
+ *       200:
+ *         description: Task found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Task'
+ *       404:
+ *         description: Task not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *   put:
+ *     summary: Update a task
+ *     description: Updates an existing task by ID (title and/or done status)
+ *     tags:
+ *       - Tasks
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The task ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/TaskUpdateInput'
+ *     responses:
+ *       200:
+ *         description: Task updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Task'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Task not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *   delete:
+ *     summary: Delete a task
+ *     description: Deletes an existing task by ID
+ *     tags:
+ *       - Tasks
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The task ID
  *     responses:
  *       204:
- *         description: A successful response
+ *         description: Task deleted successfully
+ *       404:
+ *         description: Task not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+
+/**
+ * @swagger
+ * /stats:
+ *   get:
+ *     summary: Get task statistics
+ *     description: Returns the count of total, completed (done), and pending (open) tasks
+ *     tags:
+ *       - Extra
+ *     responses:
+ *       200:
+ *         description: Task statistics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Stats'
+ */
+
+/**
+ * @swagger
+ * /reset:
+ *   post:
+ *     summary: Reset tasks
+ *     description: Resets the database back to initial seed tasks
+ *     tags:
+ *       - Extra
+ *     responses:
+ *       200:
+ *         description: Tasks reset successfully, returns all seed tasks
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Task'
  */
 
 router.post('/tasks', (req: Request, res: Response, next: NextFunction) => { // create new task
@@ -155,6 +282,24 @@ router.get('/tasks', (req: Request, res: Response, next: NextFunction) => {
 router.get('/tasks/:id', (req: Request, res: Response, next: NextFunction) => {
     try {
         res.json(getTask(Number(req.params.id)));
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Extra: stats
+router.get('/stats', (req: Request, res: Response, next: NextFunction) => {
+    try {
+        res.json(getStats());
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Extra: reset to the seed tasks
+router.post('/reset', (req: Request, res: Response, next: NextFunction) => {
+    try {
+        res.json(resetTasks());
     } catch (err) {
         next(err);
     }

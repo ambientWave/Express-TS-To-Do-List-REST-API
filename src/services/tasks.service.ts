@@ -44,15 +44,21 @@ function getTask(id: number): Task {
     return task;
 }
 
-function createTask(body: { title: string; done: number }): Task {
-    const { title } = body;
+function createTask(body: { title: string; done: boolean }): Task {
+    let { title } = body;
+    let done: number = 0;
     if (title === undefined || title === null || String(title).trim() === '') {
         throw new ValidationError('title is required and cannot be empty');
     }
-    return repo.create({ title: String(title).trim(), done: 0 });
+    if (typeof body.done !== 'boolean') {
+        throw new ValidationError('done must be a boolean');
+    }
+    done = body.done ? 1 : 0; // watch out for this switch
+
+    return repo.create({ title: String(title).trim(), done });
 }
 
-function updateTask(id: number, body: { title: string | undefined, done: number | undefined }): Task {
+function updateTask(id: number, body: { title: string | undefined, done: boolean | undefined }): Task {
     const hasTitle = Object.prototype.hasOwnProperty.call(body, 'title');
     const hasDone = Object.prototype.hasOwnProperty.call(body, 'done');
 
@@ -73,7 +79,7 @@ function updateTask(id: number, body: { title: string | undefined, done: number 
         if (typeof body.done !== 'boolean') {
             throw new ValidationError('done must be a boolean');
         }
-        changes.done = body.done;
+        changes.done = body.done ? 1 : 0;
     }
 
     const updated = repo.update(id, changes);

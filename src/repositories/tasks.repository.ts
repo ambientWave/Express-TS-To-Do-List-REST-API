@@ -96,8 +96,8 @@ export class TaskRepository {
 
     reset(): Task[] {
         const resetTransaction = this.db.transaction(() => {
-            this.db.exec('DELETE FROM tasks');
-            this.db.exec('DELETE FROM sqlite_sequence WHERE name = "tasks"');
+            this.db.exec("DELETE FROM tasks");
+            this.db.exec("DELETE FROM sqlite_sequence WHERE name = 'tasks'");
             const insertStmt = this.db.prepare('INSERT INTO tasks (id, title, done) VALUES (?, ?, ?)');
             for (const task of this.SEED_TASKS) {
                 insertStmt.run(task.id, task.title, task.done);
