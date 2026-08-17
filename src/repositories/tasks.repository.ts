@@ -69,10 +69,15 @@ export class TaskRepository {
     }
 
     create({ title, done }: { title: string; done: number }): Task {
-        const id = this.tasks.length === 0 ? 1 : Math.max(...this.tasks.map((t) => t.id)) + 1;
-        const task: TaskRow = { id, title, done };
-        this.tasks.push(task);
-        return this.toTask(task);
+        const stmt = this.db.prepare('INSERT INTO tasks (title, done) VALUES (?, ?)');
+        const info = stmt.run(title, done);
+        console.log(info);
+        const newId = Number(info.lastInsertRowid);
+        return {
+            id: newId,
+            title,
+            done: Boolean(done),
+        };
     }
 
     update(id: number, changes: Partial<{ title: string; done: number }>): Task | null {

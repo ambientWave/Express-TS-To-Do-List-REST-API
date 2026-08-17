@@ -120,7 +120,7 @@ const router: Router = Router();
 
 router.post('/tasks', (req: Request, res: Response, next: NextFunction) => { // create new task
     try {
-        const task = createTask(req.body ?? {});
+        const task = createTask(req.body ?? {}); // POST request must include Content-Type associated with "application/json" otherwise, body doesn't show up
         res.status(201).json(task); // similar to res.status(201).send(JSON.stringify(newTask));
     } catch (err) {
         next(err); // if an error occurs, pass it to the error handler
