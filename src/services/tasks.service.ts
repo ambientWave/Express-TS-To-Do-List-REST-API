@@ -6,7 +6,7 @@
 // job) and never touches the tasks array (that's the repository's job) — it
 // just calls the repository and throws domain errors when a rule is broken.
 
-import { type Task, TaskRepository } from '../repositories/tasks.repository.ts';
+import { type Task, type TaskRow, TaskRepository } from '../repositories/tasks.repository.ts';
 import { NotFoundError, ValidationError } from '../errors.ts';
 
 const repo = new TaskRepository();
@@ -44,15 +44,15 @@ function getTask(id: number): Task {
     return task;
 }
 
-function createTask(body: { title: string; done: boolean }): Task {
+function createTask(body: { title: string; done: number }): Task {
     const { title } = body;
     if (title === undefined || title === null || String(title).trim() === '') {
         throw new ValidationError('title is required and cannot be empty');
     }
-    return repo.create({ title: String(title).trim(), done: false });
+    return repo.create({ title: String(title).trim(), done: 0 });
 }
 
-function updateTask(id: number, body: { title: string | undefined, done: boolean | undefined }): Task {
+function updateTask(id: number, body: { title: string | undefined, done: number | undefined }): Task {
     const hasTitle = Object.prototype.hasOwnProperty.call(body, 'title');
     const hasDone = Object.prototype.hasOwnProperty.call(body, 'done');
 
@@ -60,7 +60,7 @@ function updateTask(id: number, body: { title: string | undefined, done: boolean
         throw new ValidationError('request body must include title and/or done');
     }
 
-    const changes: Partial<Task> = {};
+    const changes: Partial<TaskRow> = {};
 
     if (hasTitle) {
         if (body.title === null || String(body.title).trim() === '') {
