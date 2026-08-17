@@ -1,14 +1,27 @@
 # To-Do List API
 
-A small Express + TypeScript REST API that manages an in-memory to-do list.
-It supports the four CRUD operations — create, read, update, and delete — on tasks,
-and ships with interactive Swagger UI documentation at `/docs`.
+A small Express + TypeScript REST API that manages a to-do list backed by SQLite (`better-sqlite3`).
+It supports the four CRUD operations — create, read, update, and delete — on tasks, search, filtering, and stats, and ships with interactive Swagger UI documentation at `/docs`.
 
 ## Screenshot
 <img width="1918" height="901" alt="swagger_docs" src="https://github.com/user-attachments/assets/6e9e0667-8dd8-439b-a850-c8e1dcc6c706" />
 
+## Why SQLite?
 
-## Install & run
+- **Single file**: The entire database is stored in a single disk file without needing external database engines.
+- **Zero setup**: No configuration, servers to run, credentials to manage, or installation beyond the npm package.
+- **Survives restarts**: Unlike an in-memory list, data persists across server restarts and crashes.
+
+## Database Location & Initialization
+
+- The database file is located at **`tasks.db`** in the project root.
+- It is **created automatically** if missing on server startup, along with the `tasks` table schema.
+- Three initial seed tasks are inserted automatically only on the first run (when the table is empty).
+- `tasks.db` (and SQLite WAL/SHM files) are typically **git-ignored** so each clone or fresh environment starts cleanly.
+
+## Install & Run
+
+One documented command to install dependencies and start the server:
 
 ```bash
 npm install && node src/app.ts
@@ -19,20 +32,22 @@ Interactive API docs are available at **http://localhost:3000/docs**.
 
 ## Endpoints
 
-| Method   | Path               | Description                              | Success |
-|----------|--------------------|------------------------------------------|---------|
-| `GET`    | `/api/`            | API info (name, version, endpoints)      | 200     |
-| `GET`    | `/api/health`      | Health check                             | 200     |
-| `GET`    | `/api/tasks`       | List all tasks                           | 200     |
-| `POST`   | `/api/tasks`       | Create a new task (`{ "title": "..." }`) | 201     |
-| `GET`    | `/api/tasks/:id`   | Get a single task by ID                  | 200     |
-| `PUT`    | `/api/tasks/:id`   | Update a task's `title` and/or `done`    | 200     |
-| `DELETE` | `/api/tasks/:id`   | Delete a task                            | 204     |
+| Method   | Path         | Description                                                        | Success |
+|----------|--------------|--------------------------------------------------------------------|---------|
+| `GET`    | `/`          | API info (name, version, endpoints)                                | 200     |
+| `GET`    | `/health`    | Health check (`{ "status": "ok" }`)                                | 200     |
+| `GET`    | `/tasks`     | List tasks (supports `?done=true/false` and `?search=<query>`)    | 200     |
+| `POST`   | `/tasks`     | Create a new task (`{ "title": "...", "done": false }`)            | 201     |
+| `GET`    | `/tasks/:id` | Get a single task by ID                                            | 200     |
+| `PUT`    | `/tasks/:id` | Update a task's `title` and/or `done`                              | 200     |
+| `DELETE` | `/tasks/:id` | Delete a task                                                      | 204     |
+| `GET`    | `/stats`     | Task statistics via SQL `COUNT()` (`{ total, done, open }`)         | 200     |
+| `POST`   | `/reset`     | Reset database to the initial 3 seed tasks                         | 200     |
 
 ## Example
 
-```
-$ curl -i http://localhost:3000/api/tasks
+```bash
+$ curl -i http://localhost:3000/tasks
 
 HTTP/1.1 200 OK
 Connection: keep-alive
