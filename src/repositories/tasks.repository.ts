@@ -7,6 +7,7 @@
 //   - Assignment 3 (Postgres): same functions, a different driver
 // The routes and the service NEVER change, because they only ever call
 // findAll / findById / create / update / remove — they don't care what's behind them.
+// That's the beauty of layered architecture. Changes in DB require only changes in persistence layer; not all the app.
 // The functions return COPIES, the way a database hands you fresh rows.
 
 import Database from 'better-sqlite3';
@@ -70,8 +71,7 @@ export class TaskRepository {
 
     create({ title, done }: { title: string; done: number }): Task {
         const stmt = this.db.prepare('INSERT INTO tasks (title, done) VALUES (?, ?)');
-        const info = stmt.run(title, done);
-        console.log(info);
+        const info = stmt.run(title, done); // { changes: 1, lastInsertRowid: 4 }
         const newId = Number(info.lastInsertRowid);
         return {
             id: newId,
@@ -81,21 +81,29 @@ export class TaskRepository {
     }
 
     update(id: number, changes: Partial<{ title: string; done: number }>): Task | null {
-        const task = this.tasks.find((t) => t.id === id);
-        if (!task) return null;
-        Object.assign(task, changes);
-        return this.toTask(task);
+        const existing = this.findById(id);
+        if (!existing) return null;
+        const newTitle = changes.title !== undefined ? changes.title : existing.title;
+        const newDone = changes.done !== undefined ? changes.done : (existing.done ? 1 : 0);
+        this.db.prepare('UPDATE tasks SET title = ?, done = ? WHERE id = ?').run(newTitle, newDone, id);
+        return this.findById(id); // different implementation than what is used in create
     }
 
     remove(id: number): boolean {
-        const index = this.tasks.findIndex((t) => t.id === id);
-        if (index === -1) return false;
-        this.tasks.splice(index, 1);
-        return true;
+        const info = this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
+        return info.changes > 0;
     }
 
     reset(): Task[] {
-        this.tasks = this.SEED_TASKS.map((task) => ({ ...task }));
+        const resetTransaction = this.db.transaction(() => {
+            this.db.exec('DELETE FROM tasks');
+            this.db.exec('DELETE FROM sqlite_sequence WHERE name = "tasks"');
+            const insertStmt = this.db.prepare('INSERT INTO tasks (id, title, done) VALUES (?, ?, ?)');
+            for (const task of this.SEED_TASKS) {
+                insertStmt.run(task.id, task.title, task.done);
+            }
+        });
+        resetTransaction();
         return this.findAll();
     }
 }
