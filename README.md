@@ -21,6 +21,19 @@ It supports the four CRUD operations — create, read, update, and delete — on
 - Three initial seed tasks are inserted automatically only on the first run (when the table is empty).
 - `tasks.db` (and SQLite WAL/SHM files) are typically **git-ignored** so each clone or fresh environment starts cleanly.
 
+## Layered Monolithic Architecture & DAO vs Repository
+
+In this task, I aimed to learn and practice layered monolithic architecture. I even refactored my codebase into DTOs and DAOs. Finally, I clarified the distinction between the Repository and DAO layers, and when to use each separately or in combination. The following table highlights the differences clearly:
+
+| Aspect | DAO (Data Access Object) | Repository |
+|--------|--------------------------|------------|
+| **Abstraction level** | Low—mirrors database structure closely | High—models domain concepts |
+| **Concern** | How data is persisted (SQL, queries) | What data is needed for business logic |
+| **Design focus** | Database-centric | Domain-centric (DDD influence) |
+| **Typical use** | CRUD operations on tables | Business aggregate operations |
+| **Query complexity** | Often exposes raw queries | Encapsulates complex queries into named methods |
+
+
 ## Install & Run
 
 One documented command to install dependencies and start the server:
