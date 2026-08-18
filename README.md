@@ -5,6 +5,8 @@ It supports the four CRUD operations — create, read, update, and delete — on
 
 ## Screenshot
 <img width="1918" height="901" alt="swagger_docs" src="https://github.com/user-attachments/assets/6e9e0667-8dd8-439b-a850-c8e1dcc6c706" />
+<img width="1919" height="984" alt="DB_browser" src="https://github.com/user-attachments/assets/c1de0ca4-153b-4475-8af2-1b4f3f7663d8" />
+
 
 ## Why SQLite?
 
