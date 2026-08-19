@@ -11,6 +11,7 @@
     "@types/better-sqlite3": "^9.6.0",
     "better-sqlite3": "^13.0.3",
     "express": "^5.2.1",
+    "postgres": "^3.4.9",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
   }
