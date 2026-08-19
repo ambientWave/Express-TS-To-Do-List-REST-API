@@ -253,61 +253,61 @@ const router: Router = Router();
  *                 $ref: '#/components/schemas/Task'
  */
 
-router.post('/tasks', (req: Request, res: Response, next: NextFunction) => { // create new task
+router.post('/tasks', async (req: Request, res: Response, next: NextFunction) => { // create new task
     try {
-        const task = createTask(req.body ?? {}); // POST request must include Content-Type associated with "application/json" otherwise, body doesn't show up
+        const task = await createTask(req.body ?? {}); // POST request must include Content-Type associated with "application/json" otherwise, body doesn't show up
         res.status(201).json(task); // similar to res.status(201).send(JSON.stringify(newTask));
     } catch (err) {
         next(err); // if an error occurs, pass it to the error handler
     }
 });
 
-router.put('/tasks/:id', (req: Request, res: Response, next: NextFunction) => {
+router.put('/tasks/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        res.json(updateTask(Number(req.params.id), req.body ?? {}));
+        res.json(await updateTask(Number(req.params.id), req.body ?? {}));
     } catch (err) {
         next(err);
     }
 });
 
-router.delete('/tasks/:id', (req: Request, res: Response, next: NextFunction) => {
+router.delete('/tasks/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        deleteTask(Number(req.params.id));
+        await deleteTask(Number(req.params.id));
         res.status(204).send();
     } catch (err) {
         next(err);
     }
 });
 
-router.get('/tasks', (req: Request, res: Response, next: NextFunction) => {
+router.get('/tasks', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        res.json(listTasks(req.query.done as string | undefined, req.query.search as string | undefined));
+        res.json(await listTasks(req.query.done as string | undefined, req.query.search as string | undefined));
     } catch (err) {
         next(err);
     }
 });
 
-router.get('/tasks/:id', (req: Request, res: Response, next: NextFunction) => {
+router.get('/tasks/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        res.json(getTask(Number(req.params.id)));
+        res.json(await getTask(Number(req.params.id)));
     } catch (err) {
         next(err);
     }
 });
 
 // Extra: stats
-router.get('/stats', (req: Request, res: Response, next: NextFunction) => {
+router.get('/stats', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        res.json(getStats());
+        res.json(await getStats());
     } catch (err) {
         next(err);
     }
 });
 
 // Extra: reset to the seed tasks
-router.post('/reset', (req: Request, res: Response, next: NextFunction) => {
+router.post('/reset', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        res.json(resetTasks());
+        res.json(await resetTasks());
     } catch (err) {
         next(err);
     }

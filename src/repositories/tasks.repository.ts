@@ -12,8 +12,12 @@ export type { TaskRow, TaskDaoFilter as FindAllOptions, TaskDaoStats as TaskStat
 export class TaskRepository {
     private dao: TaskDao;
 
-    constructor(dbPath?: string) {
-        this.dao = new TaskDao(dbPath);
+    constructor(daoOrConfig?: TaskDao | string) {
+        if (daoOrConfig instanceof TaskDao) {
+            this.dao = daoOrConfig;
+        } else {
+            this.dao = new TaskDao(daoOrConfig);
+        }
     }
 
     private toTask(row: TaskRow): TaskDto {
@@ -26,36 +30,36 @@ export class TaskRepository {
         };
     }
 
-    findAll(options?: TaskDaoFilter): TaskDto[] {
-        const rows = this.dao.findAll(options);
+    async findAll(options?: TaskDaoFilter): Promise<TaskDto[]> {
+        const rows = await this.dao.findAll(options);
         return rows.map((row) => this.toTask(row));
     }
 
-    findById(id: number): TaskDto | null {
-        const row = this.dao.findById(id);
+    async findById(id: number): Promise<TaskDto | null> {
+        const row = await this.dao.findById(id);
         return row ? this.toTask(row) : null;
     }
 
-    create({ title, done }: { title: string; done: number }): TaskDto {
-        const createdRow = this.dao.insert({ title, done });
+    async create({ title, done }: { title: string; done: number }): Promise<TaskDto> {
+        const createdRow = await this.dao.insert({ title, done });
         return this.toTask(createdRow);
     }
 
-    update(id: number, changes: Partial<{ title: string; done: number }>): TaskDto | null {
-        const updatedRow = this.dao.update(id, changes);
+    async update(id: number, changes: Partial<{ title: string; done: number }>): Promise<TaskDto | null> {
+        const updatedRow = await this.dao.update(id, changes);
         return updatedRow ? this.toTask(updatedRow) : null;
     }
 
-    remove(id: number): boolean {
+    async remove(id: number): Promise<boolean> {
         return this.dao.delete(id);
     }
 
-    getStats(): TaskStatsDto {
+    async getStats(): Promise<TaskStatsDto> {
         return this.dao.countStats();
     }
 
-    reset(): TaskDto[] {
-        const rows = this.dao.reset();
+    async reset(): Promise<TaskDto[]> {
+        const rows = await this.dao.reset();
         return rows.map((row) => this.toTask(row));
     }
 }

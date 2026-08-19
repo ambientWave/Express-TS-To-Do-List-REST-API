@@ -9,9 +9,11 @@
   },
   "dependencies": {
     "@types/better-sqlite3": "^9.6.0",
+    "@types/pg": "^8.23.1",
     "better-sqlite3": "^13.0.3",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "postgres": "^3.4.9",
+    "pg": "^8.23.0",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
   }

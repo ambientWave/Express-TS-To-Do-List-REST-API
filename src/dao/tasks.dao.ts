@@ -2,8 +2,9 @@
 // DAO LAYER — Direct database access & SQL operations for Tasks table
 // ===========================================================================
 
-import Database from 'better-sqlite3';
-import path from 'path';
+import { Pool } from 'pg';
+import dotenv from 'dotenv';
+dotenv.config();
 
 export interface TaskRow {
     id: number;
@@ -23,9 +24,18 @@ export interface TaskDaoStats {
     done: number;
     open: number;
 }
+/*
+While migrating this DAO from SQLite to PostgreSQL (pg), notice a few other issues in this file:
 
+await inside constructor (Line 44): JavaScript / TypeScript constructors cannot be async, so using await this.pool.query(...) directly in the constructor causes a syntax error. Instead, create an async init() method or run table initialization before starting your server.
+SQLite vs PostgreSQL Syntax:
+Auto-increment: SQLite uses AUTOINCREMENT, whereas PostgreSQL uses SERIAL PRIMARY KEY or INTEGER GENERATED ALWAYS AS IDENTITY.
+Placeholders: SQLite uses ?, whereas PostgreSQL pg uses parameterized variables $1, $2, $3, ....
+Async vs Sync: SQLite (better-sqlite3) operations are synchronous (.prepare().all(), .run()), but pg queries are asynchronous and return Promises (await this.pool.query(...)).
+Leftover this.db: References to this.db.prepare(...) and PRAGMA table_info are SQLite-specific and will fail with pg.
+*/
 export class TaskDao {
-    private db: Database.Database;
+    private pool: Pool;
 
     private readonly SEED_TASKS = [
         { id: 1, title: 'Buy groceries', done: 0 },
@@ -33,62 +43,68 @@ export class TaskDao {
         { id: 3, title: 'Read a book', done: 0 }
     ];
 
-    constructor(dbPath: string = path.resolve('tasks.db')) {
-        this.db = new Database(dbPath);
-        this.db.pragma('journal_mode = WAL');
-
-        this.db.exec(`
-            CREATE TABLE IF NOT EXISTS "tasks" (
-                "id" INTEGER NOT NULL,
-                "title" TEXT NOT NULL,
-                "done" INTEGER NOT NULL CHECK(done IN (0, 1)),
-                "created_at" TEXT NOT NULL,
-                "updated_at" TEXT NOT NULL,
-                PRIMARY KEY("id" AUTOINCREMENT)
-            )
-        `);
-
-        // Migration check in case table was created previously without timestamps
-        const tableInfo = this.db.prepare('PRAGMA table_info("tasks")').all() as Array<{ name: string }>;
-        const columns = new Set(tableInfo.map((c) => c.name));
-        if (!columns.has('created_at')) {
-            const now = new Date().toISOString();
-            this.db.exec(`ALTER TABLE tasks ADD COLUMN created_at TEXT NOT NULL DEFAULT '${now}'`);
-        }
-        if (!columns.has('updated_at')) {
-            const now = new Date().toISOString();
-            this.db.exec(`ALTER TABLE tasks ADD COLUMN updated_at TEXT NOT NULL DEFAULT '${now}'`);
-        }
-
-        // Seed initial tasks only if the tasks table is empty (first run)
-        const rowCount = (this.db.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number }).count;
-        if (rowCount === 0) {
-            this.seed();
-        }
-    }
-
-    private seed(): void {
-        const now = new Date().toISOString();
-        const insertSeed = this.db.prepare('INSERT INTO tasks (id, title, done, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
-        const seedTransaction = this.db.transaction(() => {
-            for (const task of this.SEED_TASKS) {
-                insertSeed.run(task.id, task.title, task.done, now, now);
-            }
+    constructor(connectionString?: string) {
+        this.pool = new Pool({
+            connectionString: connectionString || process.env.DATABASE_URL
         });
-        seedTransaction();
+        this.init();
     }
 
-    findAll(filter?: TaskDaoFilter): TaskRow[] {
+    private async init(): Promise<void> {
+        try {
+            await this.pool.query(`
+                CREATE TABLE IF NOT EXISTS "tasks" (
+                    "id" SERIAL PRIMARY KEY,
+                    "title" TEXT NOT NULL,
+                    "done" INTEGER NOT NULL CHECK(done IN (0, 1)),
+                    "created_at" TEXT NOT NULL,
+                    "updated_at" TEXT NOT NULL
+                )
+            `);
+
+            // Seed initial tasks only if the tasks table is empty (first run)
+            const countResult = await this.pool.query('SELECT COUNT(*) as count FROM tasks');
+            const rowCount = Number(countResult.rows[0]?.count ?? 0);
+            if (rowCount === 0) {
+                await this.seed();
+            }
+        } catch (err) {
+            console.error('Error initializing tasks database table:', err);
+        }
+    }
+
+    private async seed(): Promise<void> {
+        const now = new Date().toISOString();
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            for (const task of this.SEED_TASKS) {
+                await client.query(
+                    'INSERT INTO tasks (id, title, done, created_at, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING',
+                    [task.id, task.title, task.done, now, now]
+                );
+            }
+            await client.query(`SELECT setval(pg_get_serial_sequence('tasks', 'id'), (SELECT COALESCE(MAX(id), 1) FROM tasks))`);
+            await client.query('COMMIT');
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    }
+
+    async findAll(filter?: TaskDaoFilter): Promise<TaskRow[]> {
         const conditions: string[] = [];
         const params: (string | number)[] = [];
 
         if (filter?.done !== undefined) {
-            conditions.push('done = ?');
+            conditions.push(`done = $${params.length + 1}`);
             params.push(filter.done ? 1 : 0);
         }
 
         if (filter?.search !== undefined && filter.search.trim() !== '') {
-            conditions.push('title LIKE ?');
+            conditions.push(`title ILIKE $${params.length + 1}`);
             params.push(`%${filter.search.trim()}%`);
         }
 
@@ -96,73 +112,85 @@ export class TaskDao {
         if (conditions.length > 0) {
             sql += ` WHERE ${conditions.join(' AND ')}`;
         }
-        sql += ' ORDER BY title COLLATE NOCASE ASC';
+        sql += ' ORDER BY LOWER(title) ASC, id ASC';
 
-        return this.db.prepare(sql).all(...params) as TaskRow[];
+        const result = await this.pool.query<TaskRow>(sql, params);
+        return result.rows;
     }
 
-    findById(id: number): TaskRow | undefined {
-        return this.db.prepare('SELECT id, title, done, created_at, updated_at FROM tasks WHERE id = ?').get(id) as TaskRow | undefined;
+    async findById(id: number): Promise<TaskRow | undefined> {
+        const result = await this.pool.query<TaskRow>(
+            'SELECT id, title, done, created_at, updated_at FROM tasks WHERE id = $1',
+            [id]
+        );
+        return result.rows[0];
     }
 
-    insert({ title, done }: { title: string; done: number }): TaskRow {
+    async insert({ title, done }: { title: string; done: number }): Promise<TaskRow> {
         const now = new Date().toISOString();
-        const stmt = this.db.prepare('INSERT INTO tasks (title, done, created_at, updated_at) VALUES (?, ?, ?, ?)');
-        const info = stmt.run(title, done, now, now);
-        const id = Number(info.lastInsertRowid);
-        return {
-            id,
-            title,
-            done,
-            created_at: now,
-            updated_at: now,
-        };
+        const result = await this.pool.query<TaskRow>(
+            'INSERT INTO tasks (title, done, created_at, updated_at) VALUES ($1, $2, $3, $4) RETURNING id, title, done, created_at, updated_at',
+            [title, done, now, now]
+        );
+        return result.rows[0];
     }
 
-    update(id: number, changes: Partial<{ title: string; done: number }>): TaskRow | null {
-        const existing = this.findById(id);
+    async update(id: number, changes: Partial<{ title: string; done: number }>): Promise<TaskRow | null> {
+        const existing = await this.findById(id);
         if (!existing) return null;
 
         const newTitle = changes.title !== undefined ? changes.title : existing.title;
         const newDone = changes.done !== undefined ? changes.done : existing.done;
         const now = new Date().toISOString();
 
-        this.db.prepare('UPDATE tasks SET title = ?, done = ?, updated_at = ? WHERE id = ?').run(newTitle, newDone, now, id);
-        return this.findById(id) ?? null;
+        const result = await this.pool.query<TaskRow>(
+            'UPDATE tasks SET title = $1, done = $2, updated_at = $3 WHERE id = $4 RETURNING id, title, done, created_at, updated_at',
+            [newTitle, newDone, now, id]
+        );
+        return result.rows[0] ?? null;
     }
 
-    delete(id: number): boolean {
-        const info = this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
-        return info.changes > 0;
+    async delete(id: number): Promise<boolean> {
+        const result = await this.pool.query('DELETE FROM tasks WHERE id = $1', [id]);
+        return (result.rowCount ?? 0) > 0;
     }
 
-    countStats(): TaskDaoStats {
-        const row = this.db.prepare(`
+    async countStats(): Promise<TaskDaoStats> {
+        const result = await this.pool.query(`
             SELECT
-                COUNT(*) AS total,
-                COUNT(CASE WHEN done = 1 THEN 1 END) AS done,
-                COUNT(CASE WHEN done = 0 THEN 1 END) AS open
+                COUNT(*)::int AS total,
+                COUNT(CASE WHEN done = 1 THEN 1 END)::int AS done,
+                COUNT(CASE WHEN done = 0 THEN 1 END)::int AS open
             FROM tasks
-        `).get() as TaskDaoStats;
-
+        `);
+        const row = result.rows[0];
         return {
-            total: row.total,
-            done: row.done,
-            open: row.open,
+            total: Number(row?.total ?? 0),
+            done: Number(row?.done ?? 0),
+            open: Number(row?.open ?? 0),
         };
     }
 
-    reset(): TaskRow[] {
-        const resetTransaction = this.db.transaction(() => {
-            this.db.exec("DELETE FROM tasks");
-            this.db.exec("DELETE FROM sqlite_sequence WHERE name = 'tasks'");
+    async reset(): Promise<TaskRow[]> {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query('TRUNCATE TABLE tasks RESTART IDENTITY');
             const now = new Date().toISOString();
-            const insertStmt = this.db.prepare('INSERT INTO tasks (id, title, done, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
             for (const task of this.SEED_TASKS) {
-                insertStmt.run(task.id, task.title, task.done, now, now);
+                await client.query(
+                    'INSERT INTO tasks (id, title, done, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
+                    [task.id, task.title, task.done, now, now]
+                );
             }
-        });
-        resetTransaction();
+            await client.query(`SELECT setval(pg_get_serial_sequence('tasks', 'id'), (SELECT COALESCE(MAX(id), 1) FROM tasks))`);
+            await client.query('COMMIT');
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
         return this.findAll();
     }
 }

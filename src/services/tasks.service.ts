@@ -12,7 +12,7 @@ import { NotFoundError, ValidationError } from '../errors.ts';
 
 const repo = new TaskRepository();
 
-function listTasks(done: string | undefined, search: string | undefined): Array<TaskDto> {
+async function listTasks(done: string | undefined, search: string | undefined): Promise<Array<TaskDto>> {
     let wantDone: boolean | undefined = undefined;
 
     // Filter by done=true / done=false via SQL WHERE
@@ -32,18 +32,18 @@ function listTasks(done: string | undefined, search: string | undefined): Array<
         }
     }
 
-    return repo.findAll({ done: wantDone, search: searchWord });
+    return await repo.findAll({ done: wantDone, search: searchWord });
 }
 
-function getTask(id: number): TaskDto {
-    const task = repo.findById(id);
+async function getTask(id: number): Promise<TaskDto> {
+    const task = await repo.findById(id);
     if (!task) {
         throw new NotFoundError(`Task ${id} not found`);
     }
     return task;
 }
 
-function createTask(body: CreateTaskDto): TaskDto {
+async function createTask(body: CreateTaskDto): Promise<TaskDto> {
     const { title } = body;
     if (title === undefined || title === null || String(title).trim() === '') {
         throw new ValidationError('title is required and cannot be empty');
@@ -53,10 +53,10 @@ function createTask(body: CreateTaskDto): TaskDto {
     }
     const done = body.done ? 1 : 0;
 
-    return repo.create({ title: String(title).trim(), done });
+    return await repo.create({ title: String(title).trim(), done });
 }
 
-function updateTask(id: number, body: UpdateTaskDto): TaskDto {
+async function updateTask(id: number, body: UpdateTaskDto): Promise<TaskDto> {
     const hasTitle = Object.prototype.hasOwnProperty.call(body, 'title');
     const hasDone = Object.prototype.hasOwnProperty.call(body, 'done');
 
@@ -80,26 +80,26 @@ function updateTask(id: number, body: UpdateTaskDto): TaskDto {
         changes.done = body.done ? 1 : 0;
     }
 
-    const updated = repo.update(id, changes);
+    const updated = await repo.update(id, changes);
     if (!updated) {
         throw new NotFoundError(`Task ${id} not found`);
     }
     return updated;
 }
 
-function deleteTask(id: number): void {
-    const removed = repo.remove(id);
+async function deleteTask(id: number): Promise<void> {
+    const removed = await repo.remove(id);
     if (!removed) {
         throw new NotFoundError(`Task ${id} not found`);
     }
 }
 
-function getStats(): TaskStatsDto {
-    return repo.getStats();
+async function getStats(): Promise<TaskStatsDto> {
+    return await repo.getStats();
 }
 
-function resetTasks(): TaskDto[] {
-    return repo.reset();
+async function resetTasks(): Promise<TaskDto[]> {
+    return await repo.reset();
 }
 
 export {
