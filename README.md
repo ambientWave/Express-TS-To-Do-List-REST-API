@@ -1,25 +1,66 @@
 # To-Do List API
 
-A small Express + TypeScript REST API that manages a to-do list backed by SQLite (`better-sqlite3`).
+A small Express + TypeScript REST API that manages a to-do list backed by PostgreSQL (`pg`).
 It supports the four CRUD operations — create, read, update, and delete — on tasks, search, filtering, and stats, and ships with interactive Swagger UI documentation at `/docs`.
 
 ## Screenshots
 <img width="1918" height="901" alt="swagger_docs" src="https://github.com/user-attachments/assets/6e9e0667-8dd8-439b-a850-c8e1dcc6c706" />
-<img width="1919" height="984" alt="DB_browser" src="https://github.com/user-attachments/assets/c1de0ca4-153b-4475-8af2-1b4f3f7663d8" />
+<img width="1919" height="983" alt="containerized_postgresql_database" src="https://github.com/user-attachments/assets/55e65ed6-86ac-49cf-823a-0ac9179f62a8" />
 
 
-## Why SQLite?
+## Why PostgreSQL is Superior to SQLite in Production
 
-- **Single file**: The entire database is stored in a single disk file without needing external database engines.
-- **Zero setup**: No configuration, servers to run, credentials to manage, or installation beyond the npm package.
-- **Survives restarts**: Unlike an in-memory list, data persists across server restarts and crashes.
+While SQLite is exceptional for local prototyping, testing, embedded systems, and mobile applications, PostgreSQL is the standard industry choice for production web services. Here is why PostgreSQL is superior in production environments:
 
-## Database Location & Initialization
+| Feature / Capability | SQLite | PostgreSQL (Production Standard) |
+| :--- | :--- | :--- |
+| **Concurrency & Locking** | Database-level file locking. Only **one write transaction** can execute at a time. High concurrent write traffic causes `SQLITE_BUSY` bottlenecks. | **MVCC (Multi-Version Concurrency Control)** & row-level locking. Hundreds of concurrent read and write transactions execute simultaneously without blocking each other. |
+| **Multi-Instance Scaling** | Single file on local filesystem. Cannot be shared across multiple horizontal instances (Kubernetes, AWS ECS, multiple API pods) without network filesystem issues. | **Client-Server Architecture**. Multiple distributed application servers/containers can connect concurrently to a single database cluster. |
+| **Data Types & Integrity** | Manifest typing (weak typing). Any column (except `INTEGER PRIMARY KEY`) can store any data type. | **Strict static typing & rich data types** (`UUID`, `JSONB`, `TIMESTAMPTZ`, `INET`, arrays, custom enums) with comprehensive constraints. |
+| **High Availability & Replication** | Complex to replicate in real-time across multiple nodes. | Native **streaming replication, read replicas, automated failover**, and clustering solutions (e.g., Patroni). |
+| **Backups & Point-in-Time Recovery** | Requires copying the file or vacuuming; no native WAL streaming across network. | **Continuous WAL archiving & Point-in-Time Recovery (PITR)** to restore the database to any exact millisecond. |
+| **Access Control & Security** | File-system permissions only. No granular roles, user authentication, or row-level security. | Granular **Role-Based Access Control (RBAC)**, connection encryption (SSL/TLS), and Row-Level Security (RLS). |
 
-- The database file is located at **`tasks.db`** in the project root.
-- It is **created automatically** if missing on server startup, along with the `tasks` table schema.
-- Three initial seed tasks are inserted automatically only on the first run (when the table is empty).
-- `tasks.db` (and SQLite WAL/SHM files) are typically **git-ignored** so each clone or fresh environment starts cleanly.
+---
+
+## Advantages of `.env` Files (Environment Configuration)
+
+Following the [Twelve-Factor App methodology (Config)](https://12factor.net/config), storing application configuration in environment variables / `.env` files provides several critical advantages:
+
+1. **Security & Credential Protection**:
+   - Keeps secrets, database passwords, API tokens, and private keys out of the source code repository.
+   - Prevents accidental exposure of sensitive credentials on public or shared git repositories when `.env` is properly `.gitignore`d.
+2. **Environment Parity & Flexibility**:
+   - Allows the exact same codebase and build artifact to run in development, testing, staging, and production simply by supplying different environment variables (e.g., `DATABASE_URL`, `PORT`, `NODE_ENV`).
+3. **Easy Configuration in CI/CD & Cloud Providers**:
+   - Environment variables are natively supported by Docker, Kubernetes, AWS, GCP, Azure, GitHub Actions, and container orchestrators without requiring code changes or rebuilds.
+4. **Centralized & Clean Configuration**:
+   - Provides a single, clear place (`.env.example`) to document all required environment settings for onboarding new team members.
+
+---
+
+## Advantages of Using Docker Containers
+
+Packaging the application and its dependencies into Docker containers provides significant benefits for development and deployment:
+
+1. **Elimination of "Works on My Machine" Syndrome**:
+   - Standardizes the runtime environment (Node.js version, OS libraries, C/C++ build tools) across macOS, Windows, and Linux machines.
+2. **Isolated & Reproducible Dependencies**:
+   - The application runs in its own isolated filesystem and network namespace, avoiding conflicts with host packages or differing local software versions.
+3. **Multi-Service Orchestration with Docker Compose**:
+   - Spins up both the API and the PostgreSQL database with a single command (`docker compose up --build`), including private internal networking, volume persistence, and startup health checks.
+4. **Portability & Cloud-Ready Deployment**:
+   - Container images are immutable, self-contained artifacts that can be pushed to container registries (Docker Hub, AWS ECR, GCP GCR) and deployed seamlessly to Kubernetes, ECS, Cloud Run, or VPS instances.
+5. **Fast Onboarding & Ephemeral Testing**:
+   - New contributors can clone the repo and run the full stack in seconds without manually installing PostgreSQL or setting up local database users and ports.
+
+---
+
+## Database Initialization & Seed Data
+
+- When running via Docker Compose or local PostgreSQL, the app connects to the database via `DATABASE_URL`.
+- The database schema is **initialized automatically** on startup with `CREATE TABLE IF NOT EXISTS "tasks"`.
+- Initial seed tasks are inserted automatically only on the first run (when the table is empty).
 
 ## Layered Monolithic Architecture & DAO vs Repository
 
