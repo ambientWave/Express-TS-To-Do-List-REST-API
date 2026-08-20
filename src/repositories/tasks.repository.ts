@@ -20,6 +20,10 @@ export class TaskRepository {
         }
     }
 
+    public getDao(): TaskDao {
+        return this.dao;
+    }
+
     private toTask(row: TaskRow): TaskDto {
         return {
             id: row.id,

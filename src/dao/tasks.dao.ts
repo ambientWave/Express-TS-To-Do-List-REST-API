@@ -47,29 +47,42 @@ export class TaskDao {
         this.pool = new Pool({
             connectionString: connectionString || process.env.DATABASE_URL
         });
-        this.init();
     }
 
-    private async init(): Promise<void> {
-        try {
-            await this.pool.query(`
-                CREATE TABLE IF NOT EXISTS "tasks" (
-                    "id" SERIAL PRIMARY KEY,
-                    "title" TEXT NOT NULL,
-                    "done" INTEGER NOT NULL CHECK(done IN (0, 1)),
-                    "created_at" TEXT NOT NULL,
-                    "updated_at" TEXT NOT NULL
-                )
-            `);
-
-            // Seed initial tasks only if the tasks table is empty (first run)
-            const countResult = await this.pool.query('SELECT COUNT(*) as count FROM tasks');
-            const rowCount = Number(countResult.rows[0]?.count ?? 0);
-            if (rowCount === 0) {
-                await this.seed();
+    public async initDB(retries = 10, delayMs = 3000): Promise<void> {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                await this.pool.query(`
+                    CREATE TABLE IF NOT EXISTS "tasks" (
+                        "id" SERIAL PRIMARY KEY,
+                        "title" TEXT NOT NULL,
+                        "done" INTEGER NOT NULL CHECK(done IN (0, 1)),
+                        "created_at" TEXT NOT NULL,
+                        "updated_at" TEXT NOT NULL
+                    )
+                `);
+                // Seed initial tasks only if the tasks table is empty (first run)
+                const countResult = await this.pool.query('SELECT COUNT(*) as count FROM tasks');
+                const rowCount = Number(countResult.rows[0]?.count ?? 0);
+                if (rowCount === 0) {
+                    await this.seed();
+                }
+                console.log('[Database] Tasks table initialized and ready.');
+                return;
+            } catch (err) {
+                console.error(`[Database] Init attempt ${attempt}/${retries} failed. Retrying in ${delayMs / 1000}s...`);
+                if (attempt < retries) {
+                    await new Promise((resolve) => setTimeout(resolve, delayMs));
+                } else {
+                    console.error('[Database] All initialization attempts failed.');
+                    /**
+                     * If all 10 retries fail → throw err → unhandled rejection → process crashes with non-zero exit
+                     * restart: on-failure in compose.yaml,
+                     * Docker automatically restarts the api container
+                     */
+                    throw err;
+                }
             }
-        } catch (err) {
-            console.error('Error initializing tasks database table:', err);
         }
     }
 

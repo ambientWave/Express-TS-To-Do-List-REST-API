@@ -53,4 +53,10 @@ lerna-debug.log*
 *.db-shm
 tasks.db
 
+# PostgreSQL database files
+postgres_data
+
+# Redis database files
+redis_data
+
 /generated/prisma

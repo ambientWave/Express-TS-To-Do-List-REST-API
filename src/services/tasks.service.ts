@@ -102,7 +102,12 @@ async function resetTasks(): Promise<TaskDto[]> {
     return await repo.reset();
 }
 
+async function initDB(): Promise<void> {
+    await repo.getDao().initDB();
+}
+
 export {
+    initDB,
     listTasks,
     getTask,
     createTask,
