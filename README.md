@@ -29,13 +29,13 @@ Following the [Twelve-Factor App methodology (Config)](https://12factor.net/conf
 
 1. **Security & Credential Protection**:
    - Keeps secrets, database passwords, API tokens, and private keys out of the source code repository.
-   - Prevents accidental exposure of sensitive credentials on public or shared git repositories when `.env` is properly `.gitignore`d.
+   - Prevents accidental exposure of sensitive credentials on public or shared git repositories when `.env` is properly included in `.gitignore`.
 2. **Environment Parity & Flexibility**:
    - Allows the exact same codebase and build artifact to run in development, testing, staging, and production simply by supplying different environment variables (e.g., `DATABASE_URL`, `PORT`, `NODE_ENV`).
 3. **Easy Configuration in CI/CD & Cloud Providers**:
    - Environment variables are natively supported by Docker, Kubernetes, AWS, GCP, Azure, GitHub Actions, and container orchestrators without requiring code changes or rebuilds.
 4. **Centralized & Clean Configuration**:
-   - Provides a single, clear place (`.env.example`) to document all required environment settings for onboarding new team members.
+   - Provides a single, clear place (`.env.example`) to document all required environment settings for onboarding new team members. On a clean clone, executing `cp .env.example .env && docker compose up` starts the whole stack and GET /tasks returns the seeded tasks.
 
 ---
 
@@ -59,8 +59,29 @@ Packaging the application and its dependencies into Docker containers provides s
 ## Database Initialization & Seed Data
 
 - When running via Docker Compose or local PostgreSQL, the app connects to the database via `DATABASE_URL`.
+- Docker won't run any healthchecks for the first 60 seconds after the container `db` starts, allowing PostgreSQL to complete initialization, shut down gracefully, restart, and be ready — all without the healthcheck interfering.
 - The database schema is **initialized automatically** on startup with `CREATE TABLE IF NOT EXISTS "tasks"`.
 - Initial seed tasks are inserted automatically only on the first run (when the table is empty).
+
+---
+
+## Redis for Caching
+<img width="1100" height="575" alt="image" src="https://github.com/user-attachments/assets/28e77940-e1de-4b53-8455-be103ba983e3" />
+**Redis** is an in-memory data store used for caching to reduce database load and improve response times. It stores key-value pairs with optional expiration.
+
+### Cache Hit
+A **cache hit** occurs when requested data is found in Redis. This returns the result immediately without querying the database, significantly improving performance.
+
+### Cache Miss
+A **cache miss** occurs when requested data is *not* found in Redis. The application must fetch the data from the database, then store it in Redis for future requests.
+
+### TTL (Time-to-Live)
+**TTL** defines how long a cached value remains valid before expiring. After the TTL expires, the key is automatically deleted and the next request becomes a cache miss.
+
+### Eviction
+**Eviction** is the automatic removal of keys when Redis memory reaches its limit. The eviction policy determines which keys are removed.
+
+---
 
 ## Layered Monolithic Architecture & DAO vs Repository
 
