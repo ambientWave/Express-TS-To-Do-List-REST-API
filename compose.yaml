@@ -28,7 +28,7 @@ services:
       # Adding a real SQL query ensures the check only passes when PostgreSQL 
       # can actually execute queries on the tasks database.
       test: ["CMD-SHELL", "pg_isready -U postgres -d tasks && psql -U postgres -d tasks -c 'SELECT 1'"]
-      start_period: 15s
+      start_period: 60s
       interval: 3s
       timeout: 5s
       retries: 5
