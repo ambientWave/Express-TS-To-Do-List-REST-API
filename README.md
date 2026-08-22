@@ -253,6 +253,6 @@ ETag: W/"75-7hvHNFe4C9UBIYQ/i1+IZv+x3F..."
 
 ## References
 
-[FlyRank Resource: Docker & Containers - Backend Internship](https://www.youtube.com/watch?v=0pDMrLGeoLk)
-[FlyRank Resource: SQL vs NoSQL - Backend Internship](https://www.youtube.com/watch?v=EgkdOloZNMU)
-[FlyRank Resource: Caching - Backend Internship](https://www.youtube.com/watch?v=mKgT49ErhOo)
+- [FlyRank Resource: Docker & Containers - Backend Internship](https://www.youtube.com/watch?v=0pDMrLGeoLk)
+- [FlyRank Resource: SQL vs NoSQL - Backend Internship](https://www.youtube.com/watch?v=EgkdOloZNMU)
+- [FlyRank Resource: Caching - Backend Internship](https://www.youtube.com/watch?v=mKgT49ErhOo)
