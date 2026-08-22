@@ -68,7 +68,7 @@ Packaging the application and its dependencies into Docker containers provides s
 ## Redis for Caching
 <img width="1100" height="575" alt="image" src="https://github.com/user-attachments/assets/28e77940-e1de-4b53-8455-be103ba983e3" />
 
-**Redis** is an in-memory data store used for caching to reduce database load and improve response times. It stores key-value pairs with optional expiration.
+**Redis** is an in-memory data store used for caching to reduce database load and improve response times. It stores key-value pairs with optional expiration. It's an excellent choice for webhook idempotency.
 
 ### Cache Hit
 A **cache hit** occurs when requested data is found in Redis. This returns the result immediately without querying the database, significantly improving performance.
